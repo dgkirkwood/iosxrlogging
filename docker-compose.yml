@@ -1,0 +1,72 @@
+version: "2.1"
+
+services:
+
+# Uncomment following service if need local server to test log messages
+#  webserver:
+#    build: ./nginx 
+#    ports:
+#      - "80:80"
+#    networks:
+#      logging-network:
+#        ipv4_address: 172.29.0.5
+#    container_name: webserver
+#    logging:
+#      driver: syslog
+#      options:
+#        tag: "NGINXWEB"
+#        syslog-address: "udp://172.29.0.10:1514"
+#    depends_on:
+#      - logstash
+
+#Create logstash container (data processing pipeline for ingest) using port 1514 on UDP for input. Do not start until Elasticsearch is up
+  logstash:
+    build: ./logstash
+    ports:
+      - "1514/udp:1514/udp"
+    container_name: logstash
+    networks:
+      logging-network:
+        ipv4_address: 172.29.0.10
+    depends_on:
+      - elasticsearch
+
+#Create Elasticsearch container (Search and analytics engine) using default ports. Integrate healthcheck to ensure container is fully functional before other services are brought up
+  elasticsearch:
+    image: elasticsearch
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    container_name: elasticsearch
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://172.29.0.15:9200"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+    networks:
+      logging-network:
+        ipv4_address: 172.29.0.15
+
+#Create Kibana container (web frontend for Elasticsearh used here for testing) and give it the connection for elasticsearch. Only bring up if Elasticsearch passes health check. 
+  kibana:
+    image: kibana
+    ports: 
+      - "5601:5601"
+    container_name: kibana
+    networks:
+      logging-network:
+        ipv4_address: 172.29.0.20
+    environment:
+      ELASTICSEARCH_URL: http://172.29.0.15:9200
+    depends_on:
+      elasticsearch:
+        condition: service_healthy    
+
+#Create custom network for our environment
+networks:
+  logging-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.29.0.0/16

@@ -1,0 +1,4 @@
+NGUSERNAME [a-zA-Z\.\@\-\+_%]+
+NGUSER %{NGUSERNAME}
+REPORTER (%{WORD} )?\w*/\d*/[\w\d]*/[\w\d]*
+MESSAGE .*$
